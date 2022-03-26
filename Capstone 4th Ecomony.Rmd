@@ -30,6 +30,7 @@ plot(pressure)
 Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
 
 ```{r}
+library(dplyr)
 library(readxl) #reading excel files
 library(tidyverse)
 library(mFilter) #Package used for hp filter
@@ -37,7 +38,7 @@ library(cowplot) #Allows for side by side graphs
 library(stringr)#for merge columns to creat a date column
 library(haven)
 library(lfe)
-library(dplyr)
+library(stargazer)
 
 ```
 #The first part of the project is to check the trend of employment, UI policy, and Covid related data. And I'm on employment data set.
@@ -1027,13 +1028,13 @@ View(sp)
 
 ```{r}
 Combined[is.na(Combined)] <- 0
-View(Combined)
+#View(Combined)
 ```
 
 #Set up the dummy variable for the states moratorium on evictions now and let those states equal 1
 ```{r}
 Combined$EMStatus <- ifelse(Combined$FIPS %in% c('6','9','11','15','17','24','25','27','34','35','36','37','41','50','53'),1,0)
-View(Combined)
+#View(Combined)
 ```
 
 #pick year 2020
@@ -1049,7 +1050,7 @@ count(Combined20, State)
 ```{r}
 Prep <- Combined20 %>% group_by(FIPS, Month, State, CLDAYCR) %>%
     summarise(Emp = sum(Total.E),Claims = sum(InitialClaims),Case = sum(case_count),Death = sum(death_count),Vaccine = sum(fullvaccine_count),Hospitalized = sum(hospitalized_count))
-View(Prep)
+#View(Prep)
 ```
 
 ```{r}
@@ -1170,29 +1171,74 @@ plot_grid(plot107,ncol = 1,align = 'v')
 ```
 
 
+```{r}
+project_path <- "C:/Users/85384/Desktop/Capstone/GitHub/Capstone_4th_Economy" 
+setwd(project_path)
+compare <- read.csv("numbers (1).csv")
+View(compare)
+compare <- subset(compare, select = -c(16:18))
+compare <- compare[-c(193:220), ]
+```
 
+```{r}
+compare$Deaths_RollingAvg  <- as.numeric(compare$Deaths_RollingAvg)
+compare$Hosp_Admissions_RollingAvg  <- as.numeric(compare$Hosp_Admissions_RollingAvg)
+compare$Deaths_RollingAvg[is.na(compare$Deaths_RollingAvg)] <- mean(compare$Deaths_RollingAvg, na.rm=TRUE)
+compare$Hosp_Admissions_RollingAvg[is.na(compare$Hosp_Admissions_RollingAvg)] <- mean(compare$Hosp_Admissions_RollingAvg, na.rm=TRUE)
+compare[is.na(compare)] <- 0
+compare$state_indicator <- ifelse(compare$ï..StateFIPS %in% c('39'),1,0)
+compare$Date <- as.Date(compare$Date,"%m/%d/%Y")
+class(compare$Date)
+View(compare)
+```
+
+```{r}
+reg1 <- felm(compare$LaborForce ~ compare$Cases_RollingAvg + compare$Hosp_Admissions_RollingAvg)
+
+#reg2 <- felm(compare$Employment ~ compare$Cases_RollingAvg + compare$Hosp_Admissions_RollingAvg)
+
+reg3 <- felm(compare$Unemployment ~ compare$Cases_RollingAvg + compare$Hosp_Admissions_RollingAvg)
+
+reg4 <- felm(compare$Unemployment_rate ~ compare$Cases_RollingAvg + compare$Hosp_Admissions_RollingAvg)
+
+reg5 <- felm(compare$UI_Claims ~ compare$Cases_RollingAvg + compare$Hosp_Admissions_RollingAvg)
+```
+
+```{r echo=FALSE, resize.width=10, results='asis'}
+stargazer(reg1, reg3, reg4, reg5, type = "text", dep.var.caption = "Economic Terms", dep.var.labels = c("Labor Force", "Unemployment", "Unemployment Rate", "UI Claims"), covariate.labels = c("Case Rolling Average", "Hospitalization Admissions Rolling Average"), notes.label = "Significance Levels")
+```
+
+
+```{r}
+data_Ohio <- compare %>% filter(compare$state_indicator == 1, compare$CountyFIPS == 155)
+data_Penn <- compare %>% filter(compare$state_indicator == 0, compare$CountyFIPS == 85)
+data <- rbind(data_Ohio, data_Penn)
+View(data)
+#data_mean<-data %>%
+  #group_by(states_indicaor) %>%
+#dplyr::summarize(prebinmean = mean(Uneployment_rate, na.rm=TRUE),
+                 #treatbinmean = mean(UI_Policy, na.rm=TRUE))
+#View(data_mean)
+```
 
 
 
 
 
 ```{r}
-#count(new_lf, State)
+
+plot108 <- ggplot() + 
+  geom_point(data_Ohio, mapping = aes(x=Date, y=Unemployment_rate)) + geom_smooth(data_Ohio, mapping = aes(x=Date, y=Unemployment_rate), method = lm, se = TRUE, color = "Blue")+
+  geom_point(data_Penn, mapping = aes(x=Date, y=Unemployment_rate)) + geom_smooth(data_Penn, mapping = aes(x=Date, y=Unemployment_rate), method = lm, se = TRUE, color = "Black")+
+  geom_vline(xintercept = as.numeric(as.Date("2021-07-01")), linetype=4) + ylab("Unemployment Rate")+xlab("Date") + ggtitle(size_sum(0.5), "Ohio - Trumbull(Blue) - Penn - Mercer(Black) Differences")
+plot108
 ```
+
 
 
 ```{r}
-#ggplot(new_lf,aes(x = Period, y = Employed, group = early, color = early)) +
-  #geom_line() +
-  #geom_point()
-  #scale_color_viridis_d()
-  #geom_vline(xintercept = 'Sep-21', linetype = "dashed")
+#reg6 <- felm()
 ```
-
-```{r}
-
-```
-
 
 
 
